@@ -14,6 +14,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.Toast;
 
 import java.util.Timer;
 import java.util.TimerTask;
@@ -35,6 +36,10 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        mGoButton = (Button) findViewById(R.id.go_button);
+        mBackButton = (Button) findViewById(R.id.back_button);
+        mStartButton = (Button) findViewById(R.id.start_button);
+
         // Android 6.0以降の場合
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             // パーミッションの許可状態を確認する
@@ -49,10 +54,6 @@ public class MainActivity extends AppCompatActivity {
         } else {
             getContentsInfo();
         }
-
-        mGoButton = (Button) findViewById(R.id.go_button);
-        mBackButton = (Button) findViewById(R.id.back_button);
-        mStartButton = (Button) findViewById(R.id.start_button);
     }
 
     @Override
@@ -61,6 +62,9 @@ public class MainActivity extends AppCompatActivity {
             case PERMISSIONS_REQUEST_CODE:
                 if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     getContentsInfo();
+                } else {
+                    Toast.makeText(this, "Permissionの許可がないためアプリを終了します", Toast.LENGTH_LONG).show();
+                    finish();
                 }
                 break;
             default:
@@ -93,53 +97,73 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 if(cursor.isLast()) {
-                    return;
+                    cursor.moveToFirst();
+                } else {
+                    cursor.moveToNext();
                 }
-                cursor.moveToNext();
+                int fieldIndex = cursor.getColumnIndex(MediaStore.Images.Media._ID);
+                Long id = cursor.getLong(fieldIndex);
+                Uri imageUri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id);
+
+                ImageView imageVIew = (ImageView) findViewById(R.id.imageView);
+                imageVIew.setImageURI(imageUri);
             }
         });
 
         mBackButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(cursor.isFirst()) {
-                    return;
+                if (cursor.isFirst()) {
+                    cursor.moveToLast();
+                } else {
+                    cursor.moveToPrevious();
                 }
-                cursor.moveToPrevious();
+                int fieldIndex = cursor.getColumnIndex(MediaStore.Images.Media._ID);
+                Long id = cursor.getLong(fieldIndex);
+                Uri imageUri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id);
+
+                ImageView imageVIew = (ImageView) findViewById(R.id.imageView);
+                imageVIew.setImageURI(imageUri);
             }
         });
 
         mStartButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                if (mTimer == null) {
+                    ((Button) findViewById(R.id.start_button)).setText("停止");
+                    mGoButton.setEnabled(false);
+                    mBackButton.setEnabled(false);
+                    mTimer = new Timer();
+                    mTimer.schedule(new TimerTask() {
+                        @Override
+                        public void run() {
 
-//                start_buttonを押した回数が奇数の時
-                ((Button) findViewById(R.id.start_button)).setText("停止");
-                mGoButton.setEnabled(false);
-                mBackButton.setEnabled(false);
+                            mHandler.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    if(cursor.isLast()) {
+                                        cursor.moveToFirst();
+                                    } else {
+                                        cursor.moveToNext();
+                                    }
+                                    int fieldIndex = cursor.getColumnIndex(MediaStore.Images.Media._ID);
+                                    Long id = cursor.getLong(fieldIndex);
+                                    Uri imageUri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id);
 
-                if(cursor.isLast()) {
-                    return;
+                                    ImageView imageVIew = (ImageView) findViewById(R.id.imageView);
+                                    imageVIew.setImageURI(imageUri);
+                                }
+                            });
+                        }
+                    }, 2000, 2000);
+                } else {
+                    mTimer.cancel();
+                    mTimer = null;
+                    ((Button) findViewById(R.id.start_button)).setText("再生");
+                    mGoButton.setEnabled(true);
+                    mBackButton.setEnabled(true);
                 }
-                mTimer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        cursor.moveToNext();
-
-                        mHandler.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                cursor.moveToNext();
-                            }
-                        });
-                    }
-                }, 2000, 2000);
-
-//                start_buttonを押した回数が偶数の時
-                ((Button) findViewById(R.id.start_button)).setText("再生");
-                mGoButton.setEnabled(true);
-                mBackButton.setEnabled(true);
-                cursor.close();
             }
         });
 
